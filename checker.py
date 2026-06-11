@@ -21,9 +21,3 @@ def check_slots():
 
         # если есть хоть что-то — считаем что есть слот
         return "POTENTIAL_SLOT_FOUND"
-
-LOCATIONS = [
-    "Smugowa 30/32",
-    "Piłsudskiego 100",
-    "Krzemieniecka 2B"
-]
