@@ -18,9 +18,10 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Install dependencies
-        run: |
-          pip install requests
+- name: Install dependencies
+  run: |
+    pip install requests playwright
+    playwright install chromium
 
       - name: Run script
         run: python monitor.py
