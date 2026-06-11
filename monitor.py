@@ -1,40 +1,47 @@
 import os
-import requests
-from playwright.sync_api import sync_playwright
 
-BOT_TOKEN = os.environ["BOT_TOKEN"]
-CHAT_ID = os.environ["CHAT_ID"]
+print("STARTING BOT")
+
+try:
+    import requests
+    print("REQUESTS OK")
+except Exception as e:
+    print("IMPORT ERROR:", e)
+    raise
+
+BOT_TOKEN = os.environ.get("BOT_TOKEN")
+CHAT_ID = os.environ.get("CHAT_ID")
+
+print("TOKEN:", "OK" if BOT_TOKEN else "MISSING")
+print("CHAT:", CHAT_ID)
 
 URL = "https://wizyty.uml.lodz.pl"
 
+def check():
+    r = requests.get(URL, timeout=30)
+    return r.text.lower()
 
-def send(msg):
+def send(text):
+    if not BOT_TOKEN or not CHAT_ID:
+        print("Missing credentials")
+        return
+
     requests.post(
         f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage",
-        json={"chat_id": CHAT_ID, "text": msg}
+        json={"chat_id": CHAT_ID, "text": text}
     )
 
-
-def check():
-    with sync_playwright() as p:
-        browser = p.chromium.launch(headless=True)
-        page = browser.new_page()
-
-        page.goto(URL, timeout=60000)
-        page.wait_for_timeout(8000)
-
-        html = page.content().lower()
-
-        browser.close()
-        return html
-
-
-def found_slots(html):
-    return "brak wolnych termin" not in html
-
-
 if __name__ == "__main__":
-    html = check()
+    try:
+        html = check()
+        print("SITE LOADED")
 
-    if found_slots(html):
-        send("🚨 Возможны свободные термины в Łódź! Проверь сайт: https://wizyty.uml.lodz.pl")
+        if "brak wolnych termin" not in html:
+            print("SLOTS POSSIBLE")
+            send("🚨 Возможны слоты в Łódź!")
+        else:
+            print("NO SLOTS")
+
+    except Exception as e:
+        print("ERROR:", e)
+        raise
