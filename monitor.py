@@ -1,7 +1,7 @@
 import os
 import json
 import requests
-from checker import check_all_slots
+from checker import check_slots
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 CHAT_ID = os.getenv("CHAT_ID")
