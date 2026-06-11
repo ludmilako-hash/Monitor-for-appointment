@@ -17,25 +17,43 @@ def check_all_slots():
         page = browser.new_page()
 
         for loc in LOCATIONS:
+
             try:
                 page.goto(URL)
-                page.wait_for_timeout(4000)
+                page.wait_for_timeout(5000)
 
-                page.get_by_text(loc).click()
+                # 1. выбрать отдел
+                page.get_by_text(loc, exact=False).click()
                 page.wait_for_timeout(3000)
 
-                # если нет слотов
-                if "brak wolnych terminów" in page.content().lower():
+                # 2. дождаться появления календаря (ВАЖНО)
+                page.wait_for_timeout(3000)
+
+                # 3. проверка: есть ли вообще кнопки дат
+                date_buttons = page.locator("button:has-text(''), button")
+
+                if date_buttons.count() < 5:
+                    print(f"{loc}: probably not loaded calendar")
                     continue
 
-                dates = page.locator("button:has-text(':') , text=/\\d{1,2}/")
+                # 4. пробуем кликнуть первую доступную дату
+                clicked = False
 
-                if dates.count() == 0:
+                for i in range(min(date_buttons.count(), 30)):
+                    btn = date_buttons.nth(i)
+                    text = btn.inner_text().strip()
+
+                    if any(c.isdigit() for c in text) and btn.is_enabled():
+                        btn.click()
+                        clicked = True
+                        break
+
+                if not clicked:
                     continue
 
-                dates.first.click()
-                page.wait_for_timeout(1500)
+                page.wait_for_timeout(2000)
 
+                # 5. ищем время
                 times = page.locator("button")
 
                 for i in range(times.count()):
@@ -45,8 +63,8 @@ def check_all_slots():
                     if ":" in text and t.is_enabled():
                         results.append({
                             "location": loc,
-                            "date": dates.first.inner_text().strip(),
-                            "time": text
+                            "time": text,
+                            "date": "selected"
                         })
                         break
 
