@@ -13,56 +13,51 @@ def check_all_slots():
     results = []
 
     with sync_playwright() as p:
-        browser = p.chromium.launch(
-            headless=True,
-            args=["--no-sandbox", "--disable-dev-shm-usage"]
-        )
-
+        browser = p.chromium.launch(headless=True)
         page = browser.new_page()
 
         for loc in LOCATIONS:
+
             try:
-                page.goto(URL, wait_until="networkidle")
+                page.goto(URL)
+                page.wait_for_load_state("networkidle")
 
                 page.get_by_text(loc, exact=False).click()
+                page.wait_for_timeout(2000)
 
-                page.wait_for_timeout(3000)
+                date_buttons = page.locator("button")
 
-                date_buttons = page.locator("button:visible")
+                clicked = False
 
-                found_date = False
-
-                for i in range(min(date_buttons.count(), 50)):
+                for i in range(min(date_buttons.count(), 40)):
                     btn = date_buttons.nth(i)
-                    text = (btn.text_content() or "").strip()
+                    text = (btn.inner_text() or "").strip()
 
-                    if any(ch.isdigit() for ch in text):
-                        if btn.is_visible() and btn.is_enabled():
-                            btn.click()
-                            found_date = True
-                            break
+                    if any(c.isdigit() for c in text) and btn.is_enabled():
+                        btn.click()
+                        clicked = True
+                        break
 
-                if not found_date:
+                if not clicked:
                     continue
 
                 page.wait_for_timeout(2000)
 
-                time_buttons = page.locator("button:visible")
+                times = page.locator("button")
 
-                for i in range(time_buttons.count()):
-                    t = time_buttons.nth(i)
-                    text = (t.text_content() or "").strip()
+                for i in range(times.count()):
+                    t = times.nth(i)
+                    text = (t.inner_text() or "").strip()
 
                     if ":" in text and t.is_enabled():
                         results.append({
                             "location": loc,
-                            "time": text,
-                            "date": "selected"
+                            "time": text
                         })
                         break
 
-            except Exception as e:
-                print(f"[ERROR] {loc}: {e}")
+            except:
+                continue
 
         browser.close()
 
