@@ -1,8 +1,6 @@
-name: slot checker
+name: Slot Checker
 
 on:
-  schedule:
-    - cron: "*/10 * * * *"
   workflow_dispatch:
 
 jobs:
@@ -12,16 +10,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-python@v5
+      - name: Setup Python
+        uses: actions/setup-python@v5
         with:
-          python-version: "3.12"
+          python-version: "3.11"
 
-      - run: |
-          pip install requests playwright
-          playwright install chromium
+      - name: Install deps
+        run: |
+          pip install -r requirements.txt
+          playwright install
 
-      - run: python monitor.py
-        env:
-          BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
-          CHAT_ID: ${{ secrets.CHAT_ID }}
-          
+      - name: Run checker
+        run: python checker.py
