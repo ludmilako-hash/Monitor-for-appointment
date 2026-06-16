@@ -1,66 +1,42 @@
 import os
-import json
-import requests
+from telegram import Update
+from telegram.ext import Application, CommandHandler, ContextTypes
 from checker import check_all_slots
 
-BOT_TOKEN = os.getenv("BOT_TOKEN")
-CHAT_ID = os.getenv("CHAT_ID")
-
-STATE_FILE = "state.json"
+TOKEN = os.getenv("BOT_TOKEN")
 
 
-def load_state():
-    if not os.path.exists(STATE_FILE):
-        return {}
-    with open(STATE_FILE, "r") as f:
-        return json.load(f)
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text(
+        "Привет 👋\n"
+        "Команды:\n"
+        "/check — проверить слоты сейчас"
+    )
 
 
-def save_state(state):
-    with open(STATE_FILE, "w") as f:
-        json.dump(state, f)
+async def check(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text("Проверяю... ⏳")
 
+    results = check_all_slots()
 
-def send(msg):
-    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
-    requests.post(url, data={
-        "chat_id": CHAT_ID,
-        "text": msg
-    })
-
-
-def format_results(results):
     if not results:
-        return None
+        await update.message.reply_text("❌ Нет доступных терминов")
+        return
 
-    msg = "📅 Найдены доступные слоты:\n\n"
+    msg = "📅 Найдены слоты:\n\n"
     for r in results:
-        msg += f"📍 {r['location']}\n⏰ {r['time']}\n\n"
-    return msg
+        msg += f"📍 {r['location']}\n🕒 {r['time']}\n\n"
+
+    await update.message.reply_text(msg)
 
 
 def main():
-    results = check_all_slots()
+    app = Application.builder().token(TOKEN).build()
 
-    print("DEBUG RESULTS:", results)
+    app.add_handler(CommandHandler("start", start))
+    app.add_handler(CommandHandler("check", check))
 
-    state = load_state()
-    new_state = {}
-
-    messages = []
-
-    for r in results:
-        key = f"{r['location']}|{r['time']}"
-        new_state[key] = True
-
-        if key not in state:
-            messages.append(r)
-
-    if messages:
-        send(format_results(messages))
-        save_state(new_state)
-    else:
-        print("No new slots")
+    app.run_polling()
 
 
 if __name__ == "__main__":
