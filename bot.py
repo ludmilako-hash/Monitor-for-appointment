@@ -1,71 +1,81 @@
 import os
-import json
-import subprocess
+import asyncio
 from telegram import Update
 from telegram.ext import Application, CommandHandler, ContextTypes
 
-STATE_FILE = "state.json"
+from checker import check_all_slots
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 
-
-def load_state():
-    if not os.path.exists(STATE_FILE):
-        return {"monitor": False, "last": []}
-    with open(STATE_FILE, "r") as f:
-        return json.load(f)
+# состояние (очень важно для стабильности)
+monitoring = False
 
 
-def save_state(state):
-    with open(STATE_FILE, "w") as f:
-        json.dump(state, f)
-
-
-def run_checker():
-    result = subprocess.check_output(["python", "checker.py"])
-    return result.decode("utf-8")
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text(
+        "🤖 Bot started\n\n"
+        "Commands:\n"
+        "/check - check slots once\n"
+        "/start_monitor - start auto monitoring\n"
+        "/stop_monitor - stop monitoring"
+    )
 
 
 async def check(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("⏳ Проверяю...")
+    results = check_all_slots()
 
-    output = run_checker()
+    if not results:
+        await update.message.reply_text("❌ No slots")
+        return
 
-    await update.message.reply_text(f"Результат:\n{output}")
+    msg = "📅 Available slots:\n\n"
+    for r in results:
+        msg += f"📍 {r['location']}\n⏰ {r['time']}\n\n"
+
+    await update.message.reply_text(msg)
 
 
-async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    state = load_state()
-    await update.message.reply_text(f"Мониторинг: {'ON' if state.get('monitor') else 'OFF'}")
+async def monitor_loop(app: Application):
+    global monitoring
+
+    while True:
+        if monitoring:
+            results = check_all_slots()
+
+            if results:
+                msg = "🚨 NEW SLOTS FOUND:\n\n"
+                for r in results:
+                    msg += f"📍 {r['location']}\n⏰ {r['time']}\n\n"
+
+                await app.bot.send_message(
+                    chat_id=os.getenv("CHAT_ID"),
+                    text=msg
+                )
+
+        await asyncio.sleep(60)  # каждые 60 сек
 
 
 async def start_monitor(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    state = load_state()
-    state["monitor"] = True
-    save_state(state)
-    await update.message.reply_text("🟢 Мониторинг включён (через GitHub Actions cron)")
+    global monitoring
+    monitoring = True
+    await update.message.reply_text("🟢 Monitoring started")
 
 
 async def stop_monitor(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    state = load_state()
-    state["monitor"] = False
-    save_state(state)
-    await update.message.reply_text("🔴 Мониторинг выключен")
-
-
-async def last(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    state = load_state()
-    await update.message.reply_text(str(state.get("last", [])))
+    global monitoring
+    monitoring = False
+    await update.message.reply_text("🔴 Monitoring stopped")
 
 
 def main():
     app = Application.builder().token(BOT_TOKEN).build()
 
+    app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("check", check))
-    app.add_handler(CommandHandler("status", status))
-    app.add_handler(CommandHandler("startmonitor", start_monitor))
-    app.add_handler(CommandHandler("stopmonitor", stop_monitor))
-    app.add_handler(CommandHandler("last", last))
+    app.add_handler(CommandHandler("start_monitor", start_monitor))
+    app.add_handler(CommandHandler("stop_monitor", stop_monitor))
+
+    app.create_task(monitor_loop(app))
 
     app.run_polling()
 
