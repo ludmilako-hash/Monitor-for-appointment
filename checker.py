@@ -13,54 +13,45 @@ def check_all_slots():
     results = []
 
     with sync_playwright() as p:
-     browser = p.chromium.launch(
-    headless=True,
-    args=["--no-sandbox", "--disable-dev-shm-usage"]
-)
+        browser = p.chromium.launch(
+            headless=True,
+            args=["--no-sandbox", "--disable-dev-shm-usage"]
+        )
+
+        page = browser.new_page()
 
         for loc in LOCATIONS:
-
             try:
-                page.goto(URL)
-                page.wait_for_timeout(5000)
+                page.goto(URL, wait_until="networkidle")
 
-                # 1. выбрать отдел
                 page.get_by_text(loc, exact=False).click()
+
                 page.wait_for_timeout(3000)
 
-                # 2. дождаться появления календаря (ВАЖНО)
-                page.wait_for_timeout(3000)
+                date_buttons = page.locator("button:visible")
 
-                # 3. проверка: есть ли вообще кнопки дат
-                date_buttons = page.locator("button:has-text(''), button")
+                found_date = False
 
-                if date_buttons.count() < 5:
-                    print(f"{loc}: probably not loaded calendar")
-                    continue
-
-                # 4. пробуем кликнуть первую доступную дату
-                clicked = False
-
-                for i in range(min(date_buttons.count(), 30)):
+                for i in range(min(date_buttons.count(), 50)):
                     btn = date_buttons.nth(i)
-                    text = btn.inner_text().strip()
+                    text = (btn.text_content() or "").strip()
 
-                    if any(c.isdigit() for c in text) and btn.is_enabled():
-                        btn.click()
-                        clicked = True
-                        break
+                    if any(ch.isdigit() for ch in text):
+                        if btn.is_visible() and btn.is_enabled():
+                            btn.click()
+                            found_date = True
+                            break
 
-                if not clicked:
+                if not found_date:
                     continue
 
                 page.wait_for_timeout(2000)
 
-                # 5. ищем время
-                times = page.locator("button")
+                time_buttons = page.locator("button:visible")
 
-                for i in range(times.count()):
-                    t = times.nth(i)
-                    text = t.inner_text().strip()
+                for i in range(time_buttons.count()):
+                    t = time_buttons.nth(i)
+                    text = (t.text_content() or "").strip()
 
                     if ":" in text and t.is_enabled():
                         results.append({
@@ -71,7 +62,7 @@ def check_all_slots():
                         break
 
             except Exception as e:
-                print(f"Error {loc}: {e}")
+                print(f"[ERROR] {loc}: {e}")
 
         browser.close()
 
