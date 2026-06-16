@@ -1,44 +1,72 @@
 import os
-import requests
-from checker import check_all_slots
-from telegram.ext import Application, CommandHandler
+import json
+import subprocess
+from telegram import Update
+from telegram.ext import Application, CommandHandler, ContextTypes
+
+STATE_FILE = "state.json"
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 
 
-def format_results(results):
-    if not results:
-        return "❌ Нет доступных терминов"
-
-    msg = "📅 Найденные термины:\n\n"
-
-    for r in results:
-        msg += f"📍 {r['location']}\n🕒 {r['time']}\n\n"
-
-    return msg
+def load_state():
+    if not os.path.exists(STATE_FILE):
+        return {"monitor": False, "last": []}
+    with open(STATE_FILE, "r") as f:
+        return json.load(f)
 
 
-async def start(update, context):
-    await update.message.reply_text(
-        "Привет! Напиши /check чтобы проверить слоты"
-    )
+def save_state(state):
+    with open(STATE_FILE, "w") as f:
+        json.dump(state, f)
 
 
-async def check(update, context):
-    await update.message.reply_text("🔄 Проверяю...")
+def run_checker():
+    result = subprocess.check_output(["python", "checker.py"])
+    return result.decode("utf-8")
 
-    results = check_all_slots()
 
-    await update.message.reply_text(format_results(results))
+async def check(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text("⏳ Проверяю...")
+
+    output = run_checker()
+
+    await update.message.reply_text(f"Результат:\n{output}")
+
+
+async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    state = load_state()
+    await update.message.reply_text(f"Мониторинг: {'ON' if state.get('monitor') else 'OFF'}")
+
+
+async def start_monitor(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    state = load_state()
+    state["monitor"] = True
+    save_state(state)
+    await update.message.reply_text("🟢 Мониторинг включён (через GitHub Actions cron)")
+
+
+async def stop_monitor(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    state = load_state()
+    state["monitor"] = False
+    save_state(state)
+    await update.message.reply_text("🔴 Мониторинг выключен")
+
+
+async def last(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    state = load_state()
+    await update.message.reply_text(str(state.get("last", [])))
 
 
 def main():
     app = Application.builder().token(BOT_TOKEN).build()
 
-    app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("check", check))
+    app.add_handler(CommandHandler("status", status))
+    app.add_handler(CommandHandler("startmonitor", start_monitor))
+    app.add_handler(CommandHandler("stopmonitor", stop_monitor))
+    app.add_handler(CommandHandler("last", last))
 
-    print("Bot is running...")
     app.run_polling()
 
 
