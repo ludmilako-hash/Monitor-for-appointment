@@ -1,37 +1,44 @@
 import os
-from telegram import Update
-from telegram.ext import Application, CommandHandler, ContextTypes
-from checker import check_slots
+import requests
+from checker import check_all_slots
+from telegram.ext import Application, CommandHandler
+
+BOT_TOKEN = os.getenv("BOT_TOKEN")
 
 
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("Бот активен. Используй /next или /status")
+def format_results(results):
+    if not results:
+        return "❌ Нет доступных терминов"
+
+    msg = "📅 Найденные термины:\n\n"
+
+    for r in results:
+        msg += f"📍 {r['location']}\n🕒 {r['time']}\n\n"
+
+    return msg
 
 
-async def next_slot(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    result = check_slots()
-
-    if result:
-        await update.message.reply_text("📅 Есть потенциальный ближайший слот")
-    else:
-        await update.message.reply_text("❌ Сейчас нет доступных терминов")
-
-
-async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    result = check_slots()
-
+async def start(update, context):
     await update.message.reply_text(
-        "🟢 Есть слоты" if result else "🔴 Нет слотов"
+        "Привет! Напиши /check чтобы проверить слоты"
     )
 
 
+async def check(update, context):
+    await update.message.reply_text("🔄 Проверяю...")
+
+    results = check_all_slots()
+
+    await update.message.reply_text(format_results(results))
+
+
 def main():
-    app = Application.builder().token(os.getenv("BOT_TOKEN")).build()
+    app = Application.builder().token(BOT_TOKEN).build()
 
     app.add_handler(CommandHandler("start", start))
-    app.add_handler(CommandHandler("next", next_slot))
-    app.add_handler(CommandHandler("status", status))
+    app.add_handler(CommandHandler("check", check))
 
+    print("Bot is running...")
     app.run_polling()
 
 
