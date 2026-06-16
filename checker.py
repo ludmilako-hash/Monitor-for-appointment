@@ -21,43 +21,40 @@ def check_all_slots():
                 page.goto(URL, timeout=60000)
                 page.wait_for_load_state("networkidle")
 
-                # выбрать локацию
                 page.get_by_text(loc).click(timeout=5000)
                 page.wait_for_timeout(3000)
 
-                # ищем кликабельные даты
-                date_buttons = page.locator("button")
+                buttons = page.locator("button")
 
-                found_date = False
+                clicked = False
 
-                for i in range(min(date_buttons.count(), 40)):
-                    btn = date_buttons.nth(i)
-                    text = btn.inner_text().strip()
+                for i in range(min(buttons.count(), 40)):
+                    b = buttons.nth(i)
+                    txt = b.inner_text().strip()
 
-                    if any(ch.isdigit() for ch in text):
+                    if any(ch.isdigit() for ch in txt):
                         try:
-                            btn.click(timeout=2000)
-                            found_date = True
+                            b.click(timeout=2000)
+                            clicked = True
                             break
                         except:
                             continue
 
-                if not found_date:
+                if not clicked:
                     continue
 
                 page.wait_for_timeout(2000)
 
-                # ищем время
-                time_buttons = page.locator("button")
+                times = page.locator("button")
 
-                for i in range(time_buttons.count()):
-                    t = time_buttons.nth(i)
-                    text = t.inner_text().strip()
+                for i in range(times.count()):
+                    t = times.nth(i)
+                    txt = t.inner_text().strip()
 
-                    if ":" in text:
+                    if ":" in txt:
                         results.append({
                             "location": loc,
-                            "time": text
+                            "time": txt
                         })
                         break
 
