@@ -13,8 +13,10 @@ def check_all_slots():
     results = []
 
     with sync_playwright() as p:
-        browser = p.chromium.launch(headless=True)
-        page = browser.new_page()
+     browser = p.chromium.launch(
+    headless=True,
+    args=["--no-sandbox", "--disable-dev-shm-usage"]
+)
 
         for loc in LOCATIONS:
 
